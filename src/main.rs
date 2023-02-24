@@ -1,22 +1,17 @@
 use std::io::{Stdin, Stdout, Write};
 fn main() {
-    writeln!(std::io::stdout(), "👏 Seja bem vindo(a)!!! 👏").unwrap();
+    writeln!(std::io::stdout(), "👏 Seja bem vindo(a)!!! 👏").ok();
     let mut terminal = Terminal::new();
-    loop {
-        if terminal.start() {
-            let message = terminal.ask_for_new_todo();
-            terminal.show_todo(&message);
-        } else {
-            std::process::exit(0);
-        }
-    }
+    if let Err(error) = terminal.show_message() {
+        println!("{}", error.show_erro());
+}
 }
 #[derive(Debug, Clone)]
 struct Todo {
     message: String,
 }
 impl Todo {
-    pub fn new(message: String) -> Self {
+    pub fn new(message: String) -> Todo {
         Todo { message }
     }
 }
@@ -24,6 +19,17 @@ struct Terminal {
     stdin: Stdin,
     stdout: Stdout,
 }
+enum TerminalError {
+    Stdout(std::io::Error),
+    Stdin(std::io::Error),
+}
+impl TerminalError {
+    fn show_erro(&self) -> String {
+        match self {
+            TerminalError::Stdin(error) => format!("Entrada inválida: {}", error),
+            TerminalError::Stdout(error) => format!("Saída inválida: {}", error),
+}}}
+
 impl Terminal {
     fn new() -> Terminal {
         Terminal {
@@ -31,34 +37,48 @@ impl Terminal {
             stdout: std::io::stdout(),
         }
     }
-    fn show_message(&mut self, string: &str) {
-        writeln!(self.stdout, "{}", string).unwrap();
+    
+    fn ask_for_new_todo(&mut self) -> Result<Option<Todo>, TerminalError> {
+        if !self.start()? {
+            return Ok(None);
+        }
+        writeln!(self.stdout,"Qual o nome do arquivo TODO você deseja criar?").map_err(|error| TerminalError::Stdout(error))?;
+        let name_todo = self.input()?;
+        Ok(Some(Todo::new(name_todo)))
+
     }
-    fn ask_for_new_todo(&mut self) -> Todo {
-        self.show_message("Qual o nome do arquivo TODO você deseja criar?");
-        let todo = self.input();
-        Todo::new(todo)
+    fn show_todo(&mut self, todo: &Todo) -> Result<(), TerminalError> {
+        writeln!(self.stdout, "TODO criado: {}", todo.message).map_err(|error| TerminalError::Stdout(error))
     }
-    fn show_todo(&mut self, todo: &Todo) {
-        writeln!(self.stdout, "Todo criado: {}", todo.message).unwrap();
+
+    fn show_message (&mut self) -> Result<(), TerminalError> {
+    loop {
+        let messege = self.ask_for_new_todo();
+        if let Ok(Some(messege)) = messege {
+            self.show_todo(&messege);
+        } else {
+            break;
     }
-    fn start(&mut self) -> bool {
+    }
+    Ok(())
+    }
+    fn start(&mut self) -> Result<bool, TerminalError> {
         loop {
-            self.show_message("Você deseja adicionar um novo TODO? (s/n)");
-            let answer = self.input();
-            if answer == "s" {
-                return true;
-            } else if answer == "n" {
-                self.show_message("Finalizando o programa.");
-                return false;
-            } else {
-                self.show_message("Insira uma entrada valida. Se deseja criar um novo TODO, insira 's', senão, insira 'n'.");
+            writeln!(self.stdout, "Você deseja criar um novo TODO? (s/n)").map_err(|error| TerminalError::Stdout(error))?;
+            let input = self.input()?;
+                match input.as_str() {
+                    "s" => return Ok(true),
+                    "n" => return Ok(false),
+                    &_ => 
+                    writeln!(self.stdout, "Entrada inválida. Se deseja criar um novo TODO, insira 's', senão, insira 'n'.").map_err(|error| TerminalError::Stdout(error))?,
             }
         }
-    }
-    fn input(&mut self) -> String {
+}
+    fn input(&mut self) -> Result<String, TerminalError> {
         let mut buf = String::new();
-        self.stdin.read_line(&mut buf).unwrap();
-        buf.trim().to_string()
+        self.stdin.read_line(&mut buf).map_err(|error| TerminalError::Stdin(error))?;
+        return Ok(buf.trim().to_string());
     }
 }
+
+
